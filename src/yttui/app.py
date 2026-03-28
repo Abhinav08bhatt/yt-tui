@@ -455,7 +455,7 @@ class PlayerApp(App[None]):
     }
 
     #cava-panel {
-        height: 6;
+        height: 9;
         width: 1fr;
         border: solid #4a4a4a;
         background: #0c0c0c;
@@ -737,34 +737,38 @@ class PlayerApp(App[None]):
     def set_status_message(self, message: str) -> None:
         self.query_one("#status-block", Static).update(f"{message}\nVol: {self.volume}%")
 
-    def render_cava_bars(self, values: list[int], max_height: int = 4) -> str:
-        width = max(self.query_one("#cava", CavaPanel).size.width, 1)
+    def render_cava_bars(self, values: list[int]) -> str:
+        panel = self.query_one("#cava", CavaPanel)
+        width = max(panel.size.width, 1)
+        height = max(panel.size.height, 4)
+        bar_width = 2
+        gap_width = 1
+        columns = max(1, (width + gap_width) // (bar_width + gap_width))
         if not values:
             values = [0]
-        if len(values) < width:
+        if len(values) < columns:
             expanded: list[int] = []
-            for index in range(width):
-                source_index = int(index * len(values) / width)
+            for index in range(columns):
+                source_index = int(index * len(values) / columns)
                 expanded.append(values[min(source_index, len(values) - 1)])
             values = expanded
-        elif len(values) > width:
+        elif len(values) > columns:
             compressed: list[int] = []
-            for index in range(width):
-                start = int(index * len(values) / width)
-                end = int((index + 1) * len(values) / width)
+            for index in range(columns):
+                start = int(index * len(values) / columns)
+                end = int((index + 1) * len(values) / columns)
                 chunk = values[start:max(end, start + 1)]
                 compressed.append(max(chunk) if chunk else 0)
             values = compressed
-        glyphs = " ▁▂▃▄▅▆▇█"
         rows: list[str] = []
-        scaled = [max(0, min(max_height * 8, round((value / 1000) * max_height * 8))) for value in values]
-        for row in range(max_height, 0, -1):
+        scaled = [max(0, min(height, round((value / 1000) * height))) for value in values]
+        empty_bar = " " * bar_width
+        filled_bar = "██"
+        for row in range(height, 0, -1):
             parts: list[str] = []
-            row_base = (row - 1) * 8
             for value in scaled:
-                level = max(0, min(8, value - row_base))
-                parts.append(glyphs[level])
-            rows.append("".join(parts))
+                parts.append(filled_bar if value >= row else empty_bar)
+            rows.append((" " * gap_width).join(parts).ljust(width))
         return "\n".join(rows)
 
     def update_cava(self, values: list[int]) -> None:
