@@ -2,24 +2,25 @@
 
 ## What this app is
 
-`yt-tui` is a terminal YouTube Music client built as a real TUI, not a prompt-based CLI.
+`yt-tui` is a terminal-first YouTube music player built as a real TUI.
 
-Core goals:
+Core product intent:
 
 - launch with `yt-tui`
-- clear into a full-screen TUI
-- search YouTube / YouTube Music style content
-- show ASCII thumbnail art
-- play audio in-terminal workflow with no popup GUI player
-- maintain a now-playing area, recommendations, and queue
+- stay terminal-native
+- search and play YouTube music-like results
+- show grayscale ASCII thumbnail art
+- keep playback audio-only
+- keep the interface clean, monochrome, and keyboard-driven
 
 Current stack:
 
 - Python
-- Textual for UI
-- `yt-dlp` for search, metadata, and audio URL extraction
-- `mpv` with IPC socket for playback/control
-- Pillow for thumbnail-to-ASCII conversion
+- Textual
+- `yt-dlp`
+- `mpv` via IPC socket
+- Pillow
+- `cava`
 
 Project root:
 
@@ -31,29 +32,35 @@ Project root:
 
 Layout:
 
-- top: compact search bar
-- left: ASCII art + search results
-- right top: now-playing panel with title, metadata, playback state, progress bar
-- right bottom: `Recommendations` and `Queue` in separate columns
+- top: compact `Search` bar
+- left top: ASCII art panel
+- left bottom: `Search Results`
+- right top: now-playing info panel with border title, metadata, playback state, and progress bar
+- right middle: single `Next` list
+- right bottom: embedded `Visualizer`
 - bottom: keybinding footer
 
 Visual direction:
 
 - grayscale only
-- black/gray panels
-- white focus borders
-- gray selected rows instead of blue
-- custom white block progress bar
+- black / dark gray panels
+- white active accents
+- border titles instead of separate header rows
+- white block progress bar
+- no GUI wrapper styling
 
 Important current behavior:
 
-- search results populate from `yt-dlp ytsearch`
-- selecting a result starts playback
-- ASCII art is rendered from the selected/playing track thumbnail
-- recommendations are based on the currently playing track
-- queue is also built from the currently playing track
-- `n` plays the next queue item
-- queue should auto-advance when a song ends
+- search results come from `yt-dlp ytsearch`
+- tracks are only loaded when explicitly selected
+- moving the highlight through results or `Next` does not fetch previews
+- selecting a result starts playback and updates the now-playing panel
+- ASCII art is rendered for the current track
+- `Next` is built from search heuristics around the current track
+- `n` plays the first item from `Next`
+- when a song ends, playback advances to the top item in `Next`
+- the top `Next` track is pre-resolved shortly before the current track ends
+- the embedded visualizer uses `cava` and is intended to listen to the current sink monitor
 
 ## Code structure
 
@@ -61,108 +68,113 @@ Main file:
 
 - [app.py](/home/avi/Code/Project/yt-tui/src/yttui/app.py)
 
-Key classes/functions:
+Key pieces:
 
 - `Track`
-  - simple data model for a song/video
-  - stores title, artist, album, duration, thumbnail, source URL, audio URL, etc.
+  - song/video model with metadata and resolved audio URL
 
 - `YTMusicClient`
   - `search(query, limit)`
   - `enrich(track)`
   - `resolve_audio_url(track)`
   - `recommendations_for(track, limit)`
-  - currently uses YouTube search heuristics, not official/private YouTube Music recommendation APIs
+  - recommendation logic is still heuristic search, not an official YouTube Music API
 
 - `MPVController`
   - launches `mpv`
-  - talks to it through IPC socket
-  - handles play/pause/seek/volume/status
-  - has extra error handling for race conditions during song switches
-  - status now also checks `idle-active` and `eof-reached`
+  - talks to it over IPC
+  - reports pause, position, duration, volume, idle, and eof state
 
 - `render_thumbnail_ascii(url, width, height)`
   - downloads thumbnail
-  - converts to grayscale
-  - maps pixels to ASCII ramp
+  - converts it to grayscale ASCII
 
 - `TrackListItem`
-  - list item widget used for results/recommendations/queue
+  - list row widget used for search results and `Next`
 
 - `ArtPanel`
   - displays ASCII art
-  - empty state should say `Nothing playing`
 
 - `BlockProgressBar`
-  - custom progress bar using block characters
-  - added because Textual’s built-in progress bar looked wrong and too thin
+  - thicker custom progress bar
+
+- `CavaPanel`
+  - displays the embedded visualizer output inside Textual
 
 - `PlayerApp`
-  - main Textual app
-  - contains CSS, layout, bindings, event handlers, search flow, preview flow, playback flow, queue flow
+  - owns layout, CSS, search flow, playback flow, history, next-track behavior, preload flow, and embedded `cava`
 
 ## Important implementation decisions
 
 ### 1. Real TUI, not fake terminal
 
-This app intentionally stays a true terminal app using Textual. We discussed custom fonts and decided not to move toward a fake terminal window / GUI wrapper.
+This app intentionally remains a true terminal UI.
 
 Consequence:
 
-- per-widget custom fonts are not realistic
-- terminal chooses the font
-- app can only use styling like bold/dim/italic
+- no fake terminal chrome
+- no per-widget custom fonts
+- styling comes from terminal-safe layout, contrast, and borders
 
 ### 2. Audio-only playback
 
-The app is now a YouTube Music style player, not a YouTube video player.
+The app is intentionally closer to a terminal music player than a terminal YouTube video player.
 
 Reason:
 
-- inline video in terminal is fragile and terminal-dependent
-- audio + ASCII/image-like art is much more reliable
+- inline terminal video is fragile
+- audio + ASCII art is more reliable and fits the product better
 
-### 3. Recommendations vs queue
+### 3. `Next` replaces recommendations + queue
 
-There was an intermediate version where recommendations updated on hover/preview. That was too twitchy.
+The earlier split between recommendations and queue was removed.
 
 Current intended logic:
 
-- recommendations should be tied to the currently playing track
-- queue should contain similar songs derived from the currently playing track
-- queue is what `n` and auto-next should use
+- keep one list: `Next`
+- auto-next and manual `n` both use its top item
+- `Next` is regenerated around the current track while preserving carried remainder when appropriate
 
-If behavior drifts again, check:
+If behavior drifts, check:
 
-- `load_preview`
-- `show_preview`
+- `build_next_tracks`
 - `start_playback`
-- `finish_playback_start`
+- `preload_next_track`
+- `play_next_track`
 - `refresh_playback`
 
-### 4. Auto-next
+### 4. Explicit loading only
 
-This was tricky because `mpv` is started with `--idle=yes`.
+There used to be preview loading on highlight. That created unnecessary network work and felt twitchy.
 
-That means:
+Current intended logic:
 
-- when a song ends, `mpv` may still be alive
-- process-alive checks alone are not enough
+- highlighting rows only changes selection
+- metadata / art / audio resolution happen on explicit play
 
-Fix used:
+### 5. Auto-next and preload
 
-- `MPVController.status()` now reports `idle-active` and `eof-reached`
-- `refresh_playback()` uses those signals to trigger queue handoff
+`mpv` runs with `--idle=yes`, so end-of-track detection depends on status, not just process lifetime.
 
-If auto-next fails again, likely cause:
+Current logic:
 
-- polling race
-- status interpretation issue
-- queue mutation issue
+- `MPVController.status()` exposes `idle-active` and `eof-reached`
+- `refresh_playback()` uses those fields to detect end-of-track
+- the app starts preloading the top `Next` item near the end of the current track
 
-Possible future upgrade:
+### 6. Embedded visualizer
 
-- subscribe to mpv events instead of polling every second
+The visualizer is an embedded `cava` reader rendered inside Textual.
+
+Current logic:
+
+- `cava` runs in raw ASCII mode
+- output is rendered as mirrored bars
+- app prefers the default sink monitor source instead of generic input auto-detection
+
+Potential caveat:
+
+- if the visualizer behaves strangely on a different machine, source selection will likely need adjustment first
 
 ## Current keybindings
 
@@ -172,70 +184,62 @@ Possible future upgrade:
 - `Space` pause/resume
 - `Left` / `Right` seek
 - `-` / `=` volume
-- `n` next from queue
+- `n` next
 - `p` previous from history
 - `q` or `Ctrl+C` quit
 
-## Known rough edges / next likely tasks
+## Known rough edges / likely next work
 
-### Queue quality
+### Next-track quality
 
-The queue is usable, but still heuristic.
+The biggest product issue is still heuristic quality.
 
 Good next improvements:
 
-- filter out karaoke
-- filter out slowed/reverb versions
-- filter out instrumentals when user likely wants original song
-- prefer official uploads/audio
-- avoid long loops/mixes unless explicitly searched
-- dedupe more aggressively against history/results/current queue
+- filter karaoke more aggressively
+- filter slowed / reverb / nightcore variants
+- prefer official uploads
+- avoid long loops and mixes unless explicitly searched
+- dedupe better against history and current `Next`
 
-### Recommendation quality
+### Visualizer quality
 
-The app currently uses search similarity, not official YouTube Music recommendations.
+The visualizer works, but it is still an approximation of standalone `cava`.
 
-That means:
+Likely polish tasks:
 
-- results can be decent
-- results can also be noisy or repetitive
+- smoother decay
+- better bar interpolation
+- tighter relation to actual `cava` stereo feel
+- cleaner idle behavior
 
-### Playback flow
+### Playback verification
 
-Need to verify over time:
+Still worth testing over longer runs:
 
-- queue auto-next reliability
-- queue depletion behavior
-- manual `n` behavior after several tracks
-
-### UI polish ideas
-
-- cleaner metadata row
-- better empty states
-- queue index / up-next indicator
-- explicit now-playing marker in queue
-- optional repeat / shuffle modes
+- auto-next reliability across several tracks
+- preload handoff timing
+- manual `n` after several transitions
+- behavior when `Next` empties
 
 ## Launch / install
 
-The app was installed in editable mode with:
+Editable install:
 
 ```bash
 python3 -m pip install --user -e /home/avi/Code/Project/yt-tui
 ```
 
-Command path observed:
+Observed launcher path:
 
 - `/home/avi/.local/bin/yt-tui`
-
-If edits are made in a future session, reinstall/editable refresh may still be needed.
 
 ## Short mental model for next session
 
 If continuing later, assume:
 
-1. user wants to keep this as a polished grayscale terminal music app
-2. user cares a lot about feel/UX, not just raw functionality
-3. queue/recommendation behavior is the next most important product problem
-4. avoid pushing toward a GUI or browser-based solution unless explicitly requested
-5. check `app.py` first because nearly all logic is centralized there right now
+1. user wants this to stay a polished grayscale terminal music app
+2. UX feel matters as much as raw functionality
+3. recommendation / `Next` quality is the main product problem
+4. avoid turning this into a GUI or browser app unless explicitly asked
+5. most logic still lives in [`app.py`](/home/avi/Code/Project/yt-tui/src/yttui/app.py)
