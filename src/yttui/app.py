@@ -744,24 +744,30 @@ class PlayerApp(App[None]):
         bar_width = 2
         gap_width = 1
         columns = max(1, (width + gap_width) // (bar_width + gap_width))
+        half_columns = max(1, columns // 2)
         if not values:
             values = [0]
-        if len(values) < columns:
+        if len(values) < half_columns:
             expanded: list[int] = []
-            for index in range(columns):
-                source_index = int(index * len(values) / columns)
+            for index in range(half_columns):
+                source_index = int(index * len(values) / half_columns)
                 expanded.append(values[min(source_index, len(values) - 1)])
             values = expanded
-        elif len(values) > columns:
+        elif len(values) > half_columns:
             compressed: list[int] = []
-            for index in range(columns):
-                start = int(index * len(values) / columns)
-                end = int((index + 1) * len(values) / columns)
+            for index in range(half_columns):
+                start = int(index * len(values) / half_columns)
+                end = int((index + 1) * len(values) / half_columns)
                 chunk = values[start:max(end, start + 1)]
                 compressed.append(max(chunk) if chunk else 0)
             values = compressed
+        mirrored_values = list(reversed(values)) + values
+        if len(mirrored_values) > columns:
+            mirrored_values = mirrored_values[:columns]
+        elif len(mirrored_values) < columns:
+            mirrored_values.extend([0] * (columns - len(mirrored_values)))
         rows: list[str] = []
-        scaled = [max(0, min(height, round((value / 1000) * height))) for value in values]
+        scaled = [max(0, min(height, round((value / 1000) * height))) for value in mirrored_values]
         empty_bar = " " * bar_width
         filled_bar = "██"
         for row in range(height, 0, -1):
