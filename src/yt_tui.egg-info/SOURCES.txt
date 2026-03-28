@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/yt_tui.egg-info/PKG-INFO
+src/yt_tui.egg-info/SOURCES.txt
+src/yt_tui.egg-info/dependency_links.txt
+src/yt_tui.egg-info/entry_points.txt
+src/yt_tui.egg-info/requires.txt
+src/yt_tui.egg-info/top_level.txt
+src/yttui/__init__.py
+src/yttui/__main__.py
+src/yttui/app.py

@@ -1,0 +1,16 @@
+[project]
+name = "yt-tui"
+version = "0.1.0"
+description = "Terminal YouTube Music client built with Textual"
+requires-python = ">=3.12"
+dependencies = [
+  "textual>=0.81.0",
+  "pillow>=10.0.0",
+]
+
+[project.scripts]
+yt-tui = "yttui.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

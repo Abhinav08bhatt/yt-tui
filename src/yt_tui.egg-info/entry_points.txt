@@ -1,0 +1,2 @@
+[console_scripts]
+yt-tui = yttui.__main__:main
