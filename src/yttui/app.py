@@ -269,6 +269,13 @@ class MPVController:
             }
 
 
+class CavaPanel(Static):
+    bars = reactive("", repaint=True)
+
+    def render(self) -> str:
+        return self.bars
+
+
 def render_thumbnail_ascii(url: str, width: int = 32, height: int = 18) -> str:
     if not url:
         return "\n".join([" " * width for _ in range(height)])
@@ -442,8 +449,23 @@ class PlayerApp(App[None]):
     }
 
     #next-panel {
-        height: 1fr;
+        height: 8;
         width: 1fr;
+        margin-bottom: 1;
+    }
+
+    #cava-panel {
+        height: 6;
+        width: 1fr;
+        border: solid #4a4a4a;
+        background: #0c0c0c;
+        padding: 0 1;
+    }
+
+    #cava {
+        height: 1fr;
+        color: #e6e6e6;
+        background: #0c0c0c;
     }
 
     .panel {
@@ -542,6 +564,8 @@ class PlayerApp(App[None]):
         self.loading_playback = False
         self.preloading_next = False
         self.preloaded_next: tuple[Track, str, list[Track]] | None = None
+        self.cava_process: subprocess.Popen[str] | None = None
+        self.cava_config_path: Path | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -569,17 +593,23 @@ class PlayerApp(App[None]):
                                 yield Static("0%", id="progress-percent")
                     with Vertical(id="next-panel", classes="panel"):
                         yield ListView(id="next")
+                    with Vertical(id="cava-panel"):
+                        yield CavaPanel(id="cava")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#search-panel", Container).border_title = " Search "
         self.query_one("#results-panel", Vertical).border_title = " Search Results "
         self.query_one("#next-panel", Vertical).border_title = " Next "
+        self.query_one("#cava-panel", Vertical).border_title = " Visualizer "
         self.query_one("#now-playing", Vertical).border_title = "[white] Nothing Playing [/white]"
+        self.query_one("#cava", CavaPanel).bars = self.render_cava_bars([0] * 24)
         self.query_one(Input).focus()
         self.set_interval(1.0, self.refresh_playback)
+        self.start_cava()
 
     def on_unmount(self) -> None:
+        self.stop_cava()
         self.player.stop()
 
     def populate_list(self, target: str, tracks: list[Track]) -> None:
@@ -705,6 +735,96 @@ class PlayerApp(App[None]):
 
     def set_status_message(self, message: str) -> None:
         self.query_one("#status-block", Static).update(f"{message}\nVol: {self.volume}%")
+
+    def render_cava_bars(self, values: list[int], max_height: int = 4) -> str:
+        if not values:
+            values = [0] * 24
+        glyphs = " ▁▂▃▄▅▆▇█"
+        rows: list[str] = []
+        scaled = [max(0, min(max_height * 8, round((value / 1000) * max_height * 8))) for value in values]
+        for row in range(max_height, 0, -1):
+            parts: list[str] = []
+            row_base = (row - 1) * 8
+            for value in scaled:
+                level = max(0, min(8, value - row_base))
+                parts.append(glyphs[level])
+            rows.append("".join(parts))
+        return "\n".join(rows)
+
+    def update_cava(self, values: list[int]) -> None:
+        self.query_one("#cava", CavaPanel).bars = self.render_cava_bars(values)
+
+    def stop_cava(self) -> None:
+        if self.cava_process and self.cava_process.poll() is None:
+            self.cava_process.terminate()
+            try:
+                self.cava_process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self.cava_process.kill()
+        self.cava_process = None
+        if self.cava_config_path and self.cava_config_path.exists():
+            self.cava_config_path.unlink()
+        self.cava_config_path = None
+
+    def build_cava_config(self, method: str) -> Path:
+        config = "\n".join(
+            [
+                "[general]",
+                "framerate = 30",
+                "bars = 24",
+                "bar_width = 2",
+                "bar_spacing = 1",
+                "autosens = 1",
+                "",
+                "[input]",
+                f"method = {method}",
+                "source = auto",
+                "",
+                "[output]",
+                "method = raw",
+                "data_format = ascii",
+                "ascii_max_range = 1000",
+                "bar_delimiter = 59",
+                "frame_delimiter = 10",
+                "channels = mono",
+                "",
+                "[color]",
+                "foreground = white",
+                "background = black",
+            ]
+        )
+        path = Path(tempfile.gettempdir()) / f"yt-tui-cava-{os.getpid()}.conf"
+        path.write_text(config)
+        return path
+
+    @work(thread=True)
+    def start_cava(self) -> None:
+        try:
+            for method in ("pipewire", "pulse"):
+                self.cava_config_path = self.build_cava_config(method)
+                self.cava_process = subprocess.Popen(
+                    ["cava", "-p", str(self.cava_config_path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    text=True,
+                    bufsize=1,
+                )
+                if self.cava_process.stdout is None:
+                    continue
+                for line in self.cava_process.stdout:
+                    frame = line.strip()
+                    if not frame:
+                        continue
+                    try:
+                        values = [int(part) for part in frame.split(";") if part]
+                    except ValueError:
+                        continue
+                    self.call_from_thread(self.update_cava, values)
+                if self.cava_process.poll() is None:
+                    break
+        except Exception:
+            self.call_from_thread(self.update_cava, [0] * 24)
 
     def show_now_playing(self, track: Track, art: str) -> None:
         self.current_track = track
