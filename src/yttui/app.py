@@ -738,8 +738,23 @@ class PlayerApp(App[None]):
         self.query_one("#status-block", Static).update(f"{message}\nVol: {self.volume}%")
 
     def render_cava_bars(self, values: list[int], max_height: int = 4) -> str:
+        width = max(self.query_one("#cava", CavaPanel).size.width, 1)
         if not values:
-            values = [0] * 24
+            values = [0]
+        if len(values) < width:
+            expanded: list[int] = []
+            for index in range(width):
+                source_index = int(index * len(values) / width)
+                expanded.append(values[min(source_index, len(values) - 1)])
+            values = expanded
+        elif len(values) > width:
+            compressed: list[int] = []
+            for index in range(width):
+                start = int(index * len(values) / width)
+                end = int((index + 1) * len(values) / width)
+                chunk = values[start:max(end, start + 1)]
+                compressed.append(max(chunk) if chunk else 0)
+            values = compressed
         glyphs = " ▁▂▃▄▅▆▇█"
         rows: list[str] = []
         scaled = [max(0, min(max_height * 8, round((value / 1000) * max_height * 8))) for value in values]
