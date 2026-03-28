@@ -1,102 +1,107 @@
 # yt-tui
 
-`yt-tui` is a grayscale terminal YouTube music player built with Textual, `yt-dlp`, `mpv`, and Pillow.
+Grayscale terminal YouTube music player. Built with Textual, `yt-dlp`, `mpv`, and Pillow.
 
-It is a real TUI, not a prompt-based CLI and not a GUI wrapper. The app is designed around keyboard-driven search, audio-only playback, ASCII thumbnail art, a lightweight up-next flow, and an embedded visualizer.
+A real TUI — not a prompt-based CLI and not a GUI wrapper. Keyboard-driven search, audio-only playback, ASCII thumbnail art, up-next flow, and an embedded visualizer.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  [/] Search                                                │
+├─────────────────┬────────────────────────────────────────┤
+│                 │  Now Playing                            │
+│   ASCII Art     │  Title · Artist · Album                 │
+│                 │  ▶ playing  ████████░░░░  2:34 / 4:12   │
+│ ─────────────── ├────────────────────────────────────────┤
+│  Search Results│  Next                                   │
+│  ▸ Track 1     │  ▸ Track A                              │
+│    Track 2     │    Track B                              │
+│    Track 3     │    Track C                              │
+│                 ├────────────────────────────────────────┤
+│                 │  ▁▂▃▄▅▆▇▆▅▄▃▂▁                        │
+├─────────────────┴────────────────────────────────────────┤
+│ [/] Search  [⏎] Play  [Space] Pause  [n] Next  [←/→] Seek │
+└──────────────────────────────────────────────────────────┘
+```
 
 ## Features
 
-- full-screen Textual interface
-- in-app YouTube search via `yt-dlp`
-- audio-only playback through `mpv`
+- Full-screen Textual interface
+- In-app YouTube search via `yt-dlp` (appends "music" to queries)
+- Audio-only playback through `mpv` with IPC socket control
 - ASCII thumbnail art for the current track
-- border-title now-playing panel
-- single `Next` list instead of separate recommendations and queue
-- automatic next-track handoff when playback ends
-- lightweight preload of the top `Next` item shortly before the current song ends
-- embedded grayscale `cava`-style visualizer
-- keyboard-first playback controls
-
-## Layout
-
-The current layout is:
-
-- top: `Search`
-- left: ASCII art and `Search Results`
-- right top: now-playing info and progress
-- right middle: `Next`
-- right bottom: `Visualizer`
-
-## Current Behavior
-
-- Search results are fetched from YouTube through `yt-dlp`.
-- Tracks only load when you explicitly select one.
-- Moving the highlight in search results or `Next` does not prefetch metadata, thumbnails, or audio URLs.
-- The `Next` list is derived from the currently playing track using search heuristics.
-- When the current track is near the end, the first `Next` track is pre-resolved so the transition is faster.
-- When a track ends, playback advances to the top item in `Next`.
+- Single `Next` list — no separate recommendations and queue
+- Automatic next-track handoff when playback ends
+- Lightweight preload of the top `Next` item before the current song ends
+- Embedded grayscale `cava`-style visualizer
+- Complete keyboard-first controls
 
 ## Requirements
 
-Install these on your system:
+System packages:
 
 - `python3` 3.12+
 - `yt-dlp`
 - `mpv`
 - `cava`
 
-Python dependencies are declared in [`pyproject.toml`](/home/avi/Code/Project/yt-tui/pyproject.toml).
+Python dependencies (installed automatically):
+
+- `textual >= 0.81.0`
+- `pillow >= 10.0.0`
 
 ## Install
 
-Editable install:
+**Editable pip install** (recommended):
 
 ```bash
-cd /home/avi/Code/Project/yt-tui
+git clone https://github.com/yourusername/yt-tui.git
+cd yt-tui
 python3 -m pip install --user -e .
 ```
 
-If `~/.local/bin` is on your `PATH`, you can then launch:
+Launch with:
 
 ```bash
 yt-tui
 ```
 
-You can also run the local launcher script:
+Or use the launcher script directly:
 
 ```bash
-cd /home/avi/Code/Project/yt-tui
 ./yt-tui
 ```
 
 ## Controls
 
-- `/` focus search
-- `Esc` focus results
-- `Enter` play selected track
-- `Space` pause/resume
-- `Left` / `Right` seek 10 seconds
-- `-` / `=` volume down/up
-- `n` play next
-- `p` play previous from history
-- `q` or `Ctrl+C` quit
+| Key         | Action                     |
+|-------------|----------------------------|
+| `/`         | Focus search bar           |
+| `Esc`       | Focus results list         |
+| `Enter`     | Play selected track        |
+| `Space`     | Pause / Resume             |
+| `n`         | Play next                  |
+| `p`         | Play previous from history |
+| `←` / `→`   | Seek 10 seconds            |
+| `-` / `=`   | Volume down / up           |
+| `q` / `Ctrl+C` | Quit                   |
 
-## Notes
+## Behavior
 
-- `yt-tui` is intentionally grayscale and terminal-native.
-- The visualizer uses `cava` and prefers the current sink monitor source instead of generic `auto`.
-- Recommendation quality is still heuristic, so karaoke, slowed, looped, or otherwise noisy results can still show up in `Next`.
+- Tracks only load when you explicitly select one. Highlighting in search results or `Next` does not prefetch metadata, thumbnails, or audio URLs.
+- The `Next` list is derived from the currently playing track using search heuristics. Recommendation quality is still rough — karaoke, slowed, or reverb variants may show up.
+- The visualizer uses `cava` and prefers the current PulseAudio sink monitor source.
+- Everything is intentionally grayscale and terminal-native.
+
+## Project Structure
+
+```
+src/yttui/
+├── __main__.py   # Entry point
+└── app.py        # All app logic: search, playback, mpv IPC,
+                  # next-track generation, UI layout, styling,
+                  # and embedded visualizer rendering
+```
 
 ## Development
 
-Main code lives in [`src/yttui/app.py`](/home/avi/Code/Project/yt-tui/src/yttui/app.py).
-
-The project currently keeps most app logic in that single file:
-
-- search
-- playback
-- `mpv` IPC
-- next-track generation
-- preload behavior
-- UI layout and styling
-- embedded visualizer rendering
+The project currently keeps most logic in `src/yttui/app.py`. The plan is to break it into modules as things stabilize.
