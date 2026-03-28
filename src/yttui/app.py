@@ -398,11 +398,6 @@ class PlayerApp(App[None]):
         align: right top;
     }
 
-    #track-title {
-        color: #eeeeee;
-        text-style: bold;
-    }
-
     #track-artist {
         color: #b8b8b8;
     }
@@ -562,7 +557,6 @@ class PlayerApp(App[None]):
                     with Vertical(id="now-playing"):
                         with Horizontal(id="now-top"):
                             with Vertical(id="now-main"):
-                                yield Static("", id="track-title")
                                 yield Static("Choose a track from search results", id="track-artist")
                                 yield Static("YouTube Music", id="track-album")
                                 yield Static("Views: 0  Source: YouTube Music", id="track-meta")
@@ -581,7 +575,7 @@ class PlayerApp(App[None]):
         self.query_one("#search-panel", Container).border_title = " Search "
         self.query_one("#results-panel", Vertical).border_title = " Search Results "
         self.query_one("#next-panel", Vertical).border_title = " Next "
-        self.query_one("#now-playing", Vertical).border_title = " Nothing Playing "
+        self.query_one("#now-playing", Vertical).border_title = "[white] Nothing Playing [/white]"
         self.query_one(Input).focus()
         self.set_interval(1.0, self.refresh_playback)
 
@@ -615,8 +609,7 @@ class PlayerApp(App[None]):
         if not query:
             return
         self.playback_status = "SEARCHING"
-        self.query_one("#now-playing", Vertical).border_title = f" Searching: {query} "
-        self.query_one("#track-title", Static).update("")
+        self.query_one("#now-playing", Vertical).border_title = f"[white] Searching: {query} [/white]"
         self.search_tracks(query)
 
     @work(thread=True, exclusive=True)
@@ -715,8 +708,7 @@ class PlayerApp(App[None]):
 
     def show_now_playing(self, track: Track, art: str) -> None:
         self.current_track = track
-        self.query_one("#now-playing", Vertical).border_title = f" {track.title} "
-        self.query_one("#track-title", Static).update("")
+        self.query_one("#now-playing", Vertical).border_title = f"[white] {track.title} [/white]"
         self.query_one("#track-artist", Static).update(track.display_artist)
         self.query_one("#track-album", Static).update(track.album or "YouTube Music")
         self.query_one("#track-meta", Static).update(
