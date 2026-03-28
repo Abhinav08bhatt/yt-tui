@@ -792,7 +792,26 @@ class PlayerApp(App[None]):
             self.cava_config_path.unlink()
         self.cava_config_path = None
 
-    def build_cava_config(self, method: str) -> Path:
+    def resolve_cava_source(self) -> tuple[str, str]:
+        try:
+            completed = subprocess.run(
+                ["pactl", "info"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            return ("pulse", "auto")
+        default_sink = ""
+        for line in completed.stdout.splitlines():
+            if line.startswith("Default Sink:"):
+                default_sink = line.split(":", 1)[1].strip()
+                break
+        if not default_sink:
+            return ("pulse", "auto")
+        return ("pulse", f"{default_sink}.monitor")
+
+    def build_cava_config(self, method: str, source: str) -> Path:
         config = "\n".join(
             [
                 "[general]",
@@ -804,7 +823,7 @@ class PlayerApp(App[None]):
                 "",
                 "[input]",
                 f"method = {method}",
-                "source = auto",
+                f"source = {source}",
                 "",
                 "[output]",
                 "method = raw",
@@ -826,8 +845,9 @@ class PlayerApp(App[None]):
     @work(thread=True)
     def start_cava(self) -> None:
         try:
-            for method in ("pipewire", "pulse"):
-                self.cava_config_path = self.build_cava_config(method)
+            preferred = [self.resolve_cava_source(), ("pulse", "auto"), ("pipewire", "auto")]
+            for method, source in preferred:
+                self.cava_config_path = self.build_cava_config(method, source)
                 self.cava_process = subprocess.Popen(
                     ["cava", "-p", str(self.cava_config_path)],
                     stdout=subprocess.PIPE,
