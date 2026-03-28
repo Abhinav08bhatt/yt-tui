@@ -449,9 +449,9 @@ class PlayerApp(App[None]):
     }
 
     #next-panel {
-        height: 8;
+        height: 1fr;
         width: 1fr;
-        margin-bottom: 1;
+        margin-top: 1;
     }
 
     #cava-panel {
@@ -460,6 +460,7 @@ class PlayerApp(App[None]):
         border: solid #4a4a4a;
         background: #0c0c0c;
         padding: 0 1;
+        margin-top: 1;
     }
 
     #cava {
