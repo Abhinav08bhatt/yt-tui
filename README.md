@@ -4,24 +4,7 @@ Grayscale terminal YouTube music player. Built with Textual, `yt-dlp`, `mpv`, an
 
 A real TUI — not a prompt-based CLI and not a GUI wrapper. Keyboard-driven search, audio-only playback, ASCII thumbnail art, up-next flow, and an embedded visualizer.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│  [/] Search                                                │
-├─────────────────┬────────────────────────────────────────┤
-│                 │  Now Playing                            │
-│   ASCII Art     │  Title · Artist · Album                 │
-│                 │  ▶ playing  ████████░░░░  2:34 / 4:12   │
-│ ─────────────── ├────────────────────────────────────────┤
-│  Search Results│  Next                                   │
-│  ▸ Track 1     │  ▸ Track A                              │
-│    Track 2     │    Track B                              │
-│    Track 3     │    Track C                              │
-│                 ├────────────────────────────────────────┤
-│                 │  ▁▂▃▄▅▆▇▆▅▄▃▂▁                        │
-├─────────────────┴────────────────────────────────────────┤
-│ [/] Search  [⏎] Play  [Space] Pause  [n] Next  [←/→] Seek │
-└──────────────────────────────────────────────────────────┘
-```
+![alt text](preview.png)
 
 ## Features
 

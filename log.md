@@ -26,6 +26,7 @@ Project root:
 
 - [pyproject.toml](/home/avi/Code/Project/yt-tui/pyproject.toml)
 - [README.md](/home/avi/Code/Project/yt-tui/README.md)
+- [.gitignore](/home/avi/Code/Project/yt-tui/.gitignore)
 - [app.py](/home/avi/Code/Project/yt-tui/src/yttui/app.py)
 
 ## Current UX
@@ -233,6 +234,13 @@ python3 -m pip install --user -e /home/avi/Code/Project/yt-tui
 Observed launcher path:
 
 - `/home/avi/.local/bin/yt-tui`
+
+## Repo notes
+
+- folder is now a Git repository
+- `README.md` has been updated to match the current app instead of the earlier recommendations / queue split
+- `.gitignore` now exists and includes Python noise plus `log.md`
+- important Git caveat: adding `log.md` to `.gitignore` does not stop tracking it if it is already committed; that requires `git rm --cached log.md`
 
 ## Short mental model for next session
 
